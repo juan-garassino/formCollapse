@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import argparse
-from attractors import lorenz_system, aizawa_system, rabinovich_fabrikant_system, three_scroll_system, simulate_system
+from attractors.attractors import lorenz_system, aizawa_system, rabinovich_fabrikant_system, three_scroll_system, simulate_system
 from utils import preprocess_input, plot_attractors, create_summary_plot, save_data
 
 def main(num_simulations, output_dir):

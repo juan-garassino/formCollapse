@@ -1,11 +1,19 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import logging
+from typing import Tuple
 
-def train_gan(generator, discriminator, dataloader, num_epochs, latent_dim, device):
+logger = logging.getLogger(__name__)
+
+def train_gan(generator: nn.Module, discriminator: nn.Module, dataloader: torch.utils.data.DataLoader, 
+              num_epochs: int, latent_dim: int, device: torch.device) -> Tuple[nn.Module, nn.Module]:
+    """Train the GAN and return the trained generator and discriminator."""
     criterion = nn.BCEWithLogitsLoss()
     optimizer_G = optim.Adam(generator.parameters(), lr=0.0002, betas=(0.5, 0.999))
     optimizer_D = optim.Adam(discriminator.parameters(), lr=0.0002, betas=(0.5, 0.999))
+
+    logger.info(f"Starting GAN training for {num_epochs} epochs")
 
     for epoch in range(num_epochs):
         for i, real_data in enumerate(dataloader):
@@ -38,10 +46,7 @@ def train_gan(generator, discriminator, dataloader, num_epochs, latent_dim, devi
             errG.backward()
             optimizer_G.step()
 
-        print(f'[Epoch {epoch}/{num_epochs}] Loss_D: {errD.item():.4f}, Loss_G: {errG.item():.4f}')
+        logger.info(f'[Epoch {epoch+1}/{num_epochs}] Loss_D: {errD.item():.4f}, Loss_G: {errG.item():.4f}')
 
-# Usage:
-# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-# generator.to(device)
-# discriminator.to(device)
-# train_gan(generator, discriminator, dataloader, num_epochs=50, latent_dim=100, device=device)
+    logger.info("GAN training completed")
+    return generator, discriminator

@@ -1,165 +1,197 @@
 import os
 import argparse
+import logging
+from typing import Dict, Any, Tuple
+from datetime import datetime
+
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, TensorDataset
-from scipy.integrate import odeint
-from datetime import datetime
-import hashlib
+import matplotlib
 
-# Import all attractors from a single file
-from src.attractors import lorenz_system, aizawa_system, rabinovich_fabrikant_system, three_scroll_system
+# Set Matplotlib's logger to WARNING level
+matplotlib.set_loglevel("WARNING")
 
-# Import GAN-related functions
-from src.gan.models import Generator, Discriminator
+from src.utils.config import get_config, generate_system_params, generate_initial_condition
+from src.attractors.simulators import adaptive_simulation
+from src.gan.models import create_models
 from src.gan.training import train_gan
-
-# Import utility functions
-from src.utils.general import preprocess_input, plot_attractors, create_summary_plot, save_data
+from src.utils.visualization import plot_attractor, create_summary_plot
+from src.utils.data_handling import save_data
 from src.utils.svg_gcode import save_svg, generate_gcode
 
-def simulate_system(system_func, X0, t, params):
-    """Simulate the system using SciPy's odeint."""
-    return odeint(system_func, X0, t, args=(params,))
-
-def generate_seed(system_name, index):
-    """Generate a valid seed for NumPy's random number generator."""
-    unique_string = f"{system_name}_{index}"
-    hash_object = hashlib.sha256(unique_string.encode())
-    hash_digest = hash_object.digest()
-    seed = int.from_bytes(hash_digest[:4], byteorder='big')
-    return seed % (2**32 - 1)
-
-def generate_initial_condition(rng):
-    """Generate a more diverse initial condition."""
-    return rng.uniform(-10, 10, size=3)
-
-def generate_system_params(system_name, rng):
-    """Generate system-specific parameters."""
-    if system_name == 'Lorenz':
-        return {
-            'sigma': rng.uniform(9, 11),
-            'beta': rng.uniform(2, 3),
-            'rho': rng.uniform(20, 30)
-        }
-    elif system_name == 'Aizawa':
-        return {
-            'a': rng.uniform(0.7, 1.0),
-            'b': rng.uniform(0.6, 0.8),
-            'c': rng.uniform(0.3, 0.7),
-            'd': rng.uniform(3.0, 4.0),
-            'e': rng.uniform(0.2, 0.3),
-            'f': rng.uniform(0.05, 0.15)
-        }
-    elif system_name == 'Rabinovich-Fabrikant':
-        return {
-            'alpha': rng.uniform(0.1, 0.2),
-            'gamma': rng.uniform(0.05, 0.15)
-        }
-    elif system_name == 'Three-Scroll':
-        return {
-            'a': rng.uniform(35, 45),
-            'b': rng.uniform(50, 60),
-            'c': rng.uniform(1.5, 2.0)
-        }
-    else:
-        return {}
-
-def main(num_simulations, output_dir, train_gan_flag, create_svg_gcode):
-    # Set up PyTorch device
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+def setup_logging(log_level: str = "INFO", log_file: str = None) -> None:
+    """Set up logging configuration."""
+    handlers = [logging.StreamHandler()]
+    if log_file:
+        handlers.append(logging.FileHandler(log_file))
     
-    # Time range for generating the attractor points
-    t = np.linspace(0, 100, 10000)
+    logging.basicConfig(
+        level=log_level,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=handlers
+    )
+    
+    # Set logging level for Matplotlib to WARNING
+    logging.getLogger('matplotlib').setLevel(logging.WARNING)
 
-    # Initialize a dictionary to hold results for each attractor
-    results = {}
+def parse_arguments() -> argparse.Namespace:
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(description="Simulate strange attractors and optionally train GAN.")
+    parser.add_argument('--config', type=str, default='config.yaml', help='Path to configuration file.')
+    parser.add_argument('--num_simulations', type=int, default=1, help='Number of simulations per attractor.')
+    parser.add_argument('--output_dir', type=str, default='results', help='Directory to save results.')
+    parser.add_argument('--train_gan', action='store_true', help='Flag to train GAN.')
+    parser.add_argument('--create_svg_gcode', action='store_true', help='Flag to create SVG and G-code files.')
+    parser.add_argument('--use_odeint', action='store_true', help='Use odeint for integration instead of solve_ivp.')
+    parser.add_argument('--log_level', type=str, default='INFO', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'])
+    parser.add_argument('--log_file', type=str, help='File to save logs to.')
+    return parser.parse_args()
 
-    # Define the systems to simulate
-    systems = {
-        'Lorenz': lorenz_system,
-        'Aizawa': aizawa_system,
-        'Rabinovich-Fabrikant': rabinovich_fabrikant_system,
-        'Three-Scroll': three_scroll_system
-    }
+def train_gan_on_results(results: Dict[str, np.ndarray], device: torch.device, config: Dict[str, Any], output_dir: str) -> None:
+    """Train GAN on the simulation results and generate new data."""
+    logger = logging.getLogger("gan_training")
+    logger.info("Starting GAN training")
+    
+    all_data = np.concatenate(list(results.values()), axis=0)
+    tensor_data = torch.FloatTensor(all_data).to(device)
+    dataset = TensorDataset(tensor_data)
+    dataloader = DataLoader(dataset, batch_size=config['gan_params']['batch_size'], shuffle=True)
 
-    # Simulate attractors
-    for system_name, system_func in systems.items():
-        for i in range(num_simulations):
-            seed = generate_seed(system_name, i)
-            rng = np.random.default_rng(seed)
-            
-            X0 = generate_initial_condition(rng)
-            params = generate_system_params(system_name, rng)
-            
-            data = simulate_system(system_func, X0, t, params)
-            
-            # Check if the output is too simple (e.g., a line)
-            if np.all(np.std(data, axis=0) < 1e-6):
-                print(f"Warning: Simple output detected for {system_name} simulation {i+1}. Regenerating...")
-                continue  # Skip this iteration and try again
-            
-            timestamp = datetime.now().strftime("%m%d_%H%M")
-            key = f'{system_name}_{i+1:02d}_{timestamp}'
-            results[key] = data
-            
-            if create_svg_gcode:
-                # Generate SVG and G-code for each simulation
-                save_svg(data[:, :2], f"{key}_svg", output_dir)
-                generate_gcode(data, f"{key}_gcode", output_dir)
+    generator, discriminator = create_models(config['gan_params']['latent_dim'])
+    generator.to(device)
+    discriminator.to(device)
 
-    # Create output directory
-    os.makedirs(output_dir, exist_ok=True)
+    logger.info("Training GAN")
+    train_gan(generator, discriminator, dataloader, 
+              num_epochs=config['gan_params']['num_epochs'], 
+              latent_dim=config['gan_params']['latent_dim'], 
+              device=device)
 
-    # Plot and save attractor results
-    plot_attractors(results, output_dir)
+    logger.info("Generating samples from trained GAN")
+    num_samples = 1000
+    with torch.no_grad():
+        noise = torch.randn(num_samples, config['gan_params']['latent_dim'], device=device)
+        generated_data = generator(noise).cpu().numpy().reshape(-1, 3)
 
-    # Create and save summary plot
-    create_summary_plot(results, output_dir)
+    logger.info("Saving GAN-generated data")
+    save_svg(generated_data[:, :2], "gan_generated_attractor", output_dir)
+    generate_gcode(generated_data, "gan_generated_attractor", output_dir)
 
-    # Save raw data
-    save_data(results, output_dir)
+    logger.info(f"GAN-generated data saved in the '{output_dir}' folder")
 
-    print(f"Attractor simulations saved in the '{output_dir}' folder.")
-
+def run_simulation(system_name: str, system_config: Dict[str, Any], output_dir: str, create_svg_gcode: bool, use_odeint: bool, max_time: float) -> Tuple[str, np.ndarray]:
+    """Run a single simulation for a given system with adaptive simulation and time limit."""
+    logger = logging.getLogger(f"simulation.{system_name}")
+    logger.info(f"Starting simulation for {system_name}")
+    
+    params = generate_system_params(system_config)
+    initial_condition = generate_initial_condition()
+    
+    logger.debug(f"System config: {system_config}")
+    logger.debug(f"Generated params: {params}")
+    logger.debug(f"Initial condition: {initial_condition}")
+    
+    success, data, message = adaptive_simulation(
+        system_name,
+        system_config['func'],
+        params,
+        initial_condition,
+        system_config['sim_time'],
+        system_config['sim_steps'],
+        use_odeint,
+        max_attempts=5,
+        max_time=max_time
+    )
+    
+    if not success:
+        logger.error(f"Failed to simulate {system_name}: {message}")
+        return None
+    
+    logger.info(f"Successful simulation of {system_name}: {message}")
+    
+    timestamp = datetime.now().strftime("%m%d_%H%M%S")
+    key = f'{system_name}_{timestamp}'
+    
+    logger.info(f"Plotting attractor for {key}")
+    plot_attractor(key, data, output_dir, smooth=True)
+    
     if create_svg_gcode:
-        print(f"SVG and G-code files for attractors saved in the '{output_dir}' folder.")
+        logger.info(f"Creating SVG and G-code for {key}")
+        save_svg(data[:, :2], f"{key}_svg", output_dir)
+        generate_gcode(data, f"{key}_gcode", output_dir)
+    
+    logger.info(f"Simulation for {key} completed")
+    logger.debug(f"Output shape: {data.shape}")
+    logger.debug(f"Output standard deviation: {np.std(data, axis=0)}")
 
-    if train_gan_flag:
-        # Prepare data for GAN
-        all_data = np.concatenate(list(results.values()), axis=0)
-        tensor_data = torch.FloatTensor(all_data).to(device)
-        dataset = TensorDataset(tensor_data)
-        dataloader = DataLoader(dataset, batch_size=64, shuffle=True)
+    return key, data
 
-        # Set up GAN
-        latent_dim = 100
-        generator = Generator(latent_dim).to(device)
-        discriminator = Discriminator().to(device)
+def main() -> None:
+    args = parse_arguments()
+    setup_logging(args.log_level, args.log_file)
+    logger = logging.getLogger("main")
+    
+    logger.info("Loading configuration")
+    config = get_config(args.config)
+    
+    logger.info(f"Creating output directory: {args.output_dir}")
+    os.makedirs(args.output_dir, exist_ok=True)
+    
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    logger.info(f"Using device: {device}")
 
-        # Train GAN
-        train_gan(generator, discriminator, dataloader, num_epochs=50, latent_dim=latent_dim, device=device)
+    logger.info("Configured attractors:")
+    for system_name in config['systems']:
+        logger.info(f"  - {system_name}")
 
-        # Generate new data using GAN
-        num_samples = 1000
-        with torch.no_grad():
-            noise = torch.randn(num_samples, latent_dim, device=device)
-            generated_data = generator(noise).cpu().numpy().reshape(-1, 3)
+    results = {}
+    for system_name, system_config in config['systems'].items():
+        logger.info(f"Processing system: {system_name}")
+        logger.debug(f"System config: {system_config}")
+        
+        if 'func' not in system_config:
+            logger.error(f"Missing 'func' in configuration for {system_name}. Skipping.")
+            continue
+        
+        system_results = {}
+        max_time = 60.0 if system_name.lower() == 'three_scroll_system' else 30.0
+        for i in range(args.num_simulations):
+            logger.info(f"Running simulation {i+1}/{args.num_simulations} for {system_name}")
+            simulation_result = run_simulation(system_name, system_config, args.output_dir, args.create_svg_gcode, args.use_odeint, max_time)
+            if simulation_result:
+                key, data = simulation_result
+                system_results[key] = data
+            else:
+                logger.warning(f"Simulation {i+1} for {system_name} failed.")
+        
+        if system_results:
+            results.update(system_results)
+            logger.info(f"Saving data for {system_name}")
+            save_data({k: v for k, v in results.items() if k.startswith(system_name)}, args.output_dir)
+            logger.info(f"All simulations for {system_name} completed and saved")
+        else:
+            logger.warning(f"No successful simulations for {system_name}")
 
-        # Save GAN-generated data as SVG and G-code
-        save_svg(generated_data[:, :2], "gan_generated_attractor", output_dir)
-        generate_gcode(generated_data, "gan_generated_attractor", output_dir)
+    logger.info(f"Total number of successful simulations: {len(results)}")
+    logger.info("Simulated attractors:")
+    for key in results:
+        logger.info(f"  - {key}")
 
-        print(f"GAN-generated data saved in the '{output_dir}' folder.")
+    if results:
+        logger.info("Creating summary plot")
+        create_summary_plot(results, args.output_dir, smooth=True)
+        logger.info(f"All attractor simulations saved in the '{args.output_dir}' folder")
+
+        if args.create_svg_gcode:
+            logger.info(f"SVG and G-code files for attractors saved in the '{args.output_dir}' folder")
+
+        if args.train_gan:
+            train_gan_on_results(results, device, config, args.output_dir)
     else:
-        print("GAN training skipped. Only attractor samples are generated and plotted.")
+        logger.warning("No successful simulations. Skipping summary plot, SVG/G-code creation, and GAN training.")
+
+    logger.info("Program execution completed")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Simulate strange attractors and optionally train GAN to generate SVG and G-code for pen plotting.")
-    parser.add_argument('--num_simulations', type=int, default=1, help='Number of simulations to run for each attractor.')
-    parser.add_argument('--output_dir', type=str, default='results', help='Directory to save the results.')
-    parser.add_argument('--train_gan', action='store_true', help='Flag to train GAN. If not set, only attractor samples will be generated.')
-    parser.add_argument('--create_svg_gcode', action='store_true', help='Flag to create SVG and G-code files for each attractor simulation.')
-    args = parser.parse_args()
-
-    main(args.num_simulations, args.output_dir, args.train_gan, args.create_svg_gcode)
+    main()
