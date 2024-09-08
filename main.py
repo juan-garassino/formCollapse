@@ -1,27 +1,20 @@
 import os
 import argparse
 import logging
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Optional, Tuple
 from datetime import datetime
 
 import numpy as np
 import torch
-from torch.utils.data import DataLoader, TensorDataset
-import matplotlib
-
-# Set Matplotlib's logger to WARNING level
-matplotlib.set_loglevel("WARNING")
 
 from src.utils.config import get_config, generate_system_params, generate_initial_condition
 from src.attractors.simulators import adaptive_simulation
-from src.gan.models import create_models
-from src.gan.training import train_gan
-from src.utils.visualization import plot_attractor, create_summary_plot
+from src.gan.training import train_gan_on_results, generate_samples, preprocess_data
+from src.utils.visualization import plot_attractor, create_summary_plot, plot_phase_space, plot_time_series, animate_3d, plot_poincare_section, plot_power_spectrum, plot_bifurcation, plot_lyapunov_exponent
 from src.utils.data_handling import save_data
 from src.utils.svg_gcode import save_svg, generate_gcode
 
 def setup_logging(log_level: str = "INFO", log_file: str = None) -> None:
-    """Set up logging configuration."""
     handlers = [logging.StreamHandler()]
     if log_file:
         handlers.append(logging.FileHandler(log_file))
@@ -32,65 +25,26 @@ def setup_logging(log_level: str = "INFO", log_file: str = None) -> None:
         handlers=handlers
     )
     
-    # Set logging level for Matplotlib to WARNING
     logging.getLogger('matplotlib').setLevel(logging.WARNING)
 
 def parse_arguments() -> argparse.Namespace:
-    """Parse command line arguments."""
-    parser = argparse.ArgumentParser(description="Simulate strange attractors and optionally train GAN.")
+    parser = argparse.ArgumentParser(description="Simulate strange attractors and create visualizations.")
     parser.add_argument('--config', type=str, default='config.yaml', help='Path to configuration file.')
     parser.add_argument('--num_simulations', type=int, default=1, help='Number of simulations per attractor.')
     parser.add_argument('--output_dir', type=str, default='results', help='Directory to save results.')
-    parser.add_argument('--train_gan', action='store_true', help='Flag to train GAN.')
     parser.add_argument('--create_svg_gcode', action='store_true', help='Flag to create SVG and G-code files.')
-    parser.add_argument('--use_odeint', action='store_true', help='Use odeint for integration instead of solve_ivp.')
+    parser.add_argument('--create_advanced_viz', action='store_true', help='Flag to create advanced visualizations.')
+    parser.add_argument('--train_gan', action='store_true', help='Flag to train GAN.')
     parser.add_argument('--log_level', type=str, default='INFO', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'])
     parser.add_argument('--log_file', type=str, help='File to save logs to.')
     return parser.parse_args()
 
-def train_gan_on_results(results: Dict[str, np.ndarray], device: torch.device, config: Dict[str, Any], output_dir: str) -> None:
-    """Train GAN on the simulation results and generate new data."""
-    logger = logging.getLogger("gan_training")
-    logger.info("Starting GAN training")
-    
-    all_data = np.concatenate(list(results.values()), axis=0)
-    tensor_data = torch.FloatTensor(all_data).to(device)
-    dataset = TensorDataset(tensor_data)
-    dataloader = DataLoader(dataset, batch_size=config['gan_params']['batch_size'], shuffle=True)
-
-    generator, discriminator = create_models(config['gan_params']['latent_dim'])
-    generator.to(device)
-    discriminator.to(device)
-
-    logger.info("Training GAN")
-    train_gan(generator, discriminator, dataloader, 
-              num_epochs=config['gan_params']['num_epochs'], 
-              latent_dim=config['gan_params']['latent_dim'], 
-              device=device)
-
-    logger.info("Generating samples from trained GAN")
-    num_samples = 1000
-    with torch.no_grad():
-        noise = torch.randn(num_samples, config['gan_params']['latent_dim'], device=device)
-        generated_data = generator(noise).cpu().numpy().reshape(-1, 3)
-
-    logger.info("Saving GAN-generated data")
-    save_svg(generated_data[:, :2], "gan_generated_attractor", output_dir)
-    generate_gcode(generated_data, "gan_generated_attractor", output_dir)
-
-    logger.info(f"GAN-generated data saved in the '{output_dir}' folder")
-
-def run_simulation(system_name: str, system_config: Dict[str, Any], output_dir: str, create_svg_gcode: bool, use_odeint: bool, max_time: float) -> Tuple[str, np.ndarray]:
-    """Run a single simulation for a given system with adaptive simulation and time limit."""
+def run_simulation(system_name: str, system_config: Dict[str, Any], output_dir: str, create_svg_gcode: bool, create_advanced_viz: bool, max_time: float) -> Tuple[Optional[str], Optional[np.ndarray]]:
     logger = logging.getLogger(f"simulation.{system_name}")
     logger.info(f"Starting simulation for {system_name}")
     
     params = generate_system_params(system_config)
     initial_condition = generate_initial_condition()
-    
-    logger.debug(f"System config: {system_config}")
-    logger.debug(f"Generated params: {params}")
-    logger.debug(f"Initial condition: {initial_condition}")
     
     success, data, message = adaptive_simulation(
         system_name,
@@ -99,14 +53,13 @@ def run_simulation(system_name: str, system_config: Dict[str, Any], output_dir: 
         initial_condition,
         system_config['sim_time'],
         system_config['sim_steps'],
-        use_odeint,
         max_attempts=5,
         max_time=max_time
     )
     
     if not success:
         logger.error(f"Failed to simulate {system_name}: {message}")
-        return None
+        return None, None
     
     logger.info(f"Successful simulation of {system_name}: {message}")
     
@@ -115,17 +68,81 @@ def run_simulation(system_name: str, system_config: Dict[str, Any], output_dir: 
     
     logger.info(f"Plotting attractor for {key}")
     plot_attractor(key, data, output_dir, smooth=True)
+    plot_phase_space(key, data, output_dir, smooth=True)
+    plot_time_series(key, data, output_dir, smooth=True)
     
+    if create_advanced_viz:
+        logger.info(f"Creating advanced visualizations for {key}")
+        
+        # 3D Animation
+        animate_3d(key, data, output_dir)
+        
+        # Poincaré Section
+        for plane in ['xy', 'yz', 'xz']:
+            plot_poincare_section(key, data, output_dir, plane=plane)
+        
+        # Power Spectrum
+        plot_power_spectrum(key, data, output_dir)
+        
+        # Bifurcation Diagram
+        if 'bifurcation_param' in system_config:
+            param_name = system_config['bifurcation_param']['name']
+            param_range = np.linspace(
+                system_config['bifurcation_param']['start'],
+                system_config['bifurcation_param']['stop'],
+                system_config['bifurcation_param']['num']
+            )
+            plot_bifurcation(key, SYSTEM_FUNCTIONS[system_config['func']], param_range, param_name, output_dir)
+        else:
+            logger.info(f"Skipping bifurcation diagram for {key}: No bifurcation parameter specified in config")
+        
+        # Lyapunov Exponent
+        # Note: This requires a function to compute Lyapunov exponents, which is not provided in the current setup
+        # If you have such a function, you can uncomment the following lines:
+        # lyap_exp = compute_lyapunov_exponents(system_config['func'], params, initial_condition, system_config['sim_time'], system_config['sim_steps'])
+        # plot_lyapunov_exponent(key, lyap_exp, output_dir)
+        
     if create_svg_gcode:
         logger.info(f"Creating SVG and G-code for {key}")
         save_svg(data[:, :2], f"{key}_svg", output_dir)
         generate_gcode(data, f"{key}_gcode", output_dir)
     
     logger.info(f"Simulation for {key} completed")
-    logger.debug(f"Output shape: {data.shape}")
-    logger.debug(f"Output standard deviation: {np.std(data, axis=0)}")
-
     return key, data
+
+def process_system(system_name: str, system_config: Dict[str, Any], args: argparse.Namespace, max_time: float) -> Dict[str, np.ndarray]:
+    logger = logging.getLogger(f"process.{system_name}")
+    logger.info(f"Processing system: {system_name}")
+    
+    if 'func' not in system_config:
+        logger.error(f"Missing 'func' in configuration for {system_name}. Skipping.")
+        return {}
+    
+    system_results = {}
+    for i in range(args.num_simulations):
+        logger.info(f"Running simulation {i+1}/{args.num_simulations} for {system_name}")
+        simulation_result = run_simulation(
+            system_name,
+            system_config,
+            args.output_dir,
+            args.create_svg_gcode,
+            args.create_advanced_viz,
+            max_time
+        )
+        if simulation_result[0]:
+            key, data = simulation_result
+            system_results[key] = data
+        else:
+            logger.warning(f"Simulation {i+1} for {system_name} failed.")
+    
+    if system_results:
+        logger.info(f"Saving data for {system_name}")
+        save_data(system_results, args.output_dir)
+        logger.info(f"All simulations for {system_name} completed and saved")
+    else:
+        logger.warning(f"No successful simulations for {system_name}")
+    
+    return system_results
 
 def main() -> None:
     args = parse_arguments()
@@ -147,31 +164,9 @@ def main() -> None:
 
     results = {}
     for system_name, system_config in config['systems'].items():
-        logger.info(f"Processing system: {system_name}")
-        logger.debug(f"System config: {system_config}")
-        
-        if 'func' not in system_config:
-            logger.error(f"Missing 'func' in configuration for {system_name}. Skipping.")
-            continue
-        
-        system_results = {}
         max_time = 60.0 if system_name.lower() == 'three_scroll_system' else 30.0
-        for i in range(args.num_simulations):
-            logger.info(f"Running simulation {i+1}/{args.num_simulations} for {system_name}")
-            simulation_result = run_simulation(system_name, system_config, args.output_dir, args.create_svg_gcode, args.use_odeint, max_time)
-            if simulation_result:
-                key, data = simulation_result
-                system_results[key] = data
-            else:
-                logger.warning(f"Simulation {i+1} for {system_name} failed.")
-        
-        if system_results:
-            results.update(system_results)
-            logger.info(f"Saving data for {system_name}")
-            save_data({k: v for k, v in results.items() if k.startswith(system_name)}, args.output_dir)
-            logger.info(f"All simulations for {system_name} completed and saved")
-        else:
-            logger.warning(f"No successful simulations for {system_name}")
+        system_results = process_system(system_name, system_config, args, max_time)
+        results.update(system_results)
 
     logger.info(f"Total number of successful simulations: {len(results)}")
     logger.info("Simulated attractors:")
@@ -187,6 +182,7 @@ def main() -> None:
             logger.info(f"SVG and G-code files for attractors saved in the '{args.output_dir}' folder")
 
         if args.train_gan:
+            logger.info("Starting GAN training on simulation results")
             train_gan_on_results(results, device, config, args.output_dir)
     else:
         logger.warning("No successful simulations. Skipping summary plot, SVG/G-code creation, and GAN training.")
