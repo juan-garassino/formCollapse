@@ -10,9 +10,10 @@ import torch
 from src.utils.config import get_config, generate_system_params, generate_initial_condition
 from src.attractors.simulators import adaptive_simulation, SYSTEM_FUNCTIONS
 from src.gan.training import train_gan_on_results, generate_samples, preprocess_data
-from src.utils.visualization import plot_attractor, create_summary_plot, plot_phase_space, plot_time_series, animate_3d, plot_poincare_section, plot_power_spectrum, plot_bifurcation, plot_lyapunov_exponent
+from src.utils.visualization import plot_attractor, create_summary_plot, plot_phase_space, plot_time_series, plot_poincare_section, plot_power_spectrum, plot_bifurcation, plot_lyapunov_exponent
 from src.utils.data_handling import save_data
 from src.utils.svg_gcode import save_svg, generate_gcode
+from src.utils.animations import animate_3d
 
 def setup_logging(log_level: str = "INFO", log_file: str = None) -> None:
     handlers = [logging.StreamHandler()]
