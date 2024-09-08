@@ -8,7 +8,7 @@ import numpy as np
 import torch
 
 from src.utils.config import get_config, generate_system_params, generate_initial_condition
-from src.attractors.simulators import adaptive_simulation
+from src.attractors.simulators import adaptive_simulation, SYSTEM_FUNCTIONS
 from src.gan.training import train_gan_on_results, generate_samples, preprocess_data
 from src.utils.visualization import plot_attractor, create_summary_plot, plot_phase_space, plot_time_series, animate_3d, plot_poincare_section, plot_power_spectrum, plot_bifurcation, plot_lyapunov_exponent
 from src.utils.data_handling import save_data
@@ -50,11 +50,10 @@ def run_simulation(system_name: str, system_config: Dict[str, Any], output_dir: 
         system_name,
         system_config['func'],
         params,
-        initial_condition,
         system_config['sim_time'],
         system_config['sim_steps'],
-        max_attempts=5,
-        max_time=max_time
+        max_attempts=10,  # optional
+        max_time=30.0     # optional
     )
     
     if not success:

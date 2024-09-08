@@ -14,246 +14,246 @@ systems:
     sim_time: 100
     sim_steps: 10000
 
-  Aizawa:
-    func: aizawa_system
-    params:
-      a:
-        type: uniform
-        range: [0.7, 1.0]
-      b:
-        type: uniform
-        range: [0.6, 0.8]
-      c:
-        type: uniform
-        range: [0.3, 0.7]
-      d:
-        type: uniform
-        range: [3.0, 4.0]
-      e:
-        type: uniform
-        range: [0.2, 0.3]
-      f:
-        type: uniform
-        range: [0.05, 0.15]
-    sim_time: 100
-    sim_steps: 10000
+#   Aizawa:
+#     func: aizawa_system
+#     params:
+#       a:
+#         type: uniform
+#         range: [0.7, 1.0]
+#       b:
+#         type: uniform
+#         range: [0.6, 0.8]
+#       c:
+#         type: uniform
+#         range: [0.3, 0.7]
+#       d:
+#         type: uniform
+#         range: [3.0, 4.0]
+#       e:
+#         type: uniform
+#         range: [0.2, 0.3]
+#       f:
+#         type: uniform
+#         range: [0.05, 0.15]
+#     sim_time: 100
+#     sim_steps: 10000
 
-  Rabinovich-Fabrikant:
-    func: rabinovich_fabrikant_system
-    params:
-      alpha:
-        type: uniform
-        range: [0.1, 0.3]
-      gamma:
-        type: uniform
-        range: [0.05, 0.25]
-    sim_time: 50
-    sim_steps: 5000
+#   Rabinovich-Fabrikant:
+#     func: rabinovich_fabrikant_system
+#     params:
+#       alpha:
+#         type: uniform
+#         range: [0.1, 0.3]
+#       gamma:
+#         type: uniform
+#         range: [0.05, 0.25]
+#     sim_time: 50
+#     sim_steps: 5000
 
-  Three-Scroll:
-    func: three_scroll_system
-    params:
-      a:
-        type: uniform
-        range: [32, 48]
-      b:
-        type: uniform
-        range: [45, 65]
-      c:
-        type: uniform
-        range: [1.5, 2.2]
-    sim_time: 50
-    sim_steps: 5000
+#   Three-Scroll:
+#     func: three_scroll_system
+#     params:
+#       a:
+#         type: uniform
+#         range: [32, 48]
+#       b:
+#         type: uniform
+#         range: [45, 65]
+#       c:
+#         type: uniform
+#         range: [1.5, 2.2]
+#     sim_time: 50
+#     sim_steps: 5000
 
-  Rossler:
-    func: rossler_system
-    params:
-      a:
-        type: uniform
-        range: [0.1, 0.3]
-      b:
-        type: uniform
-        range: [0.1, 0.3]
-      c:
-        type: uniform
-        range: [5.0, 6.0]
-    sim_time: 100
-    sim_steps: 10000
+#   Rossler:
+#     func: rossler_system
+#     params:
+#       a:
+#         type: uniform
+#         range: [0.1, 0.3]
+#       b:
+#         type: uniform
+#         range: [0.1, 0.3]
+#       c:
+#         type: uniform
+#         range: [5.0, 6.0]
+#     sim_time: 100
+#     sim_steps: 10000
 
-  Chen:
-    func: chen_system
-    params:
-      a:
-        type: uniform
-        range: [35, 40]
-      b:
-        type: uniform
-        range: [3, 3.5]
-      c:
-        type: uniform
-        range: [20, 28]
-    sim_time: 100
-    sim_steps: 10000
+#   Chen:
+#     func: chen_system
+#     params:
+#       a:
+#         type: uniform
+#         range: [35, 40]
+#       b:
+#         type: uniform
+#         range: [3, 3.5]
+#       c:
+#         type: uniform
+#         range: [20, 28]
+#     sim_time: 100
+#     sim_steps: 10000
 
-  Halvorsen:
-    func: halvorsen_system
-    params:
-      a:
-        type: uniform
-        range: [1.2, 1.4]
-    sim_time: 100
-    sim_steps: 10000
+#   Halvorsen:
+#     func: halvorsen_system
+#     params:
+#       a:
+#         type: uniform
+#         range: [1.2, 1.4]
+#     sim_time: 100
+#     sim_steps: 10000
 
-  Anishchenko:
-    func: anishchenko_system
-    params:
-      a:
-        type: uniform
-        range: [0.1, 0.3]
-      b:
-        type: uniform
-        range: [0.2, 0.4]
-      c:
-        type: uniform
-        range: [1.0, 1.5]
-    sim_time: 100
-    sim_steps: 10000
+#   Anishchenko:
+#     func: anishchenko_system
+#     params:
+#       a:
+#         type: uniform
+#         range: [0.1, 0.3]
+#       b:
+#         type: uniform
+#         range: [0.2, 0.4]
+#       c:
+#         type: uniform
+#         range: [1.0, 1.5]
+#     sim_time: 100
+#     sim_steps: 10000
 
-  Arnold:
-    func: arnold_system
-    params:
-      omega:
-        type: uniform
-        range: [0.5, 1.5]
-    sim_time: 100
-    sim_steps: 10000
+#   Arnold:
+#     func: arnold_system
+#     params:
+#       omega:
+#         type: uniform
+#         range: [0.5, 1.5]
+#     sim_time: 100
+#     sim_steps: 10000
 
-  Burke-Shaw:
-    func: burke_shaw_system
-    params:
-      a:
-        type: uniform
-        range: [10, 11]
-      b:
-        type: uniform
-        range: [4, 4.5]
-      c:
-        type: uniform
-        range: [2, 2.5]
-    sim_time: 100
-    sim_steps: 10000
+#   Burke-Shaw:
+#     func: burke_shaw_system
+#     params:
+#       a:
+#         type: uniform
+#         range: [10, 11]
+#       b:
+#         type: uniform
+#         range: [4, 4.5]
+#       c:
+#         type: uniform
+#         range: [2, 2.5]
+#     sim_time: 100
+#     sim_steps: 10000
 
-  Chen-Celikovsky:
-    func: chen_celikovsky_system
-    params:
-      a:
-        type: uniform
-        range: [35, 36]
-      c:
-        type: uniform
-        range: [20, 21]
-      d:
-        type: uniform
-        range: [1, 2]
-    sim_time: 100
-    sim_steps: 10000
+#   Chen-Celikovsky:
+#     func: chen_celikovsky_system
+#     params:
+#       a:
+#         type: uniform
+#         range: [35, 36]
+#       c:
+#         type: uniform
+#         range: [20, 21]
+#       d:
+#         type: uniform
+#         range: [1, 2]
+#     sim_time: 100
+#     sim_steps: 10000
 
-  Finance:
-    func: finance_system
-    params:
-      a:
-        type: uniform
-        range: [0.8, 1.0]
-      b:
-        type: uniform
-        range: [0.1, 0.2]
-      c:
-        type: uniform
-        range: [0.8, 1.0]
-    sim_time: 100
-    sim_steps: 10000
+#   Finance:
+#     func: finance_system
+#     params:
+#       a:
+#         type: uniform
+#         range: [0.8, 1.0]
+#       b:
+#         type: uniform
+#         range: [0.1, 0.2]
+#       c:
+#         type: uniform
+#         range: [0.8, 1.0]
+#     sim_time: 100
+#     sim_steps: 10000
 
-  Newton-Leipnik:
-    func: newton_leipnik_system
-    params:
-      a:
-        type: uniform
-        range: [0.3, 0.5]
-      b:
-        type: uniform
-        range: [0.35, 0.45]
-    sim_time: 100
-    sim_steps: 10000
+#   Newton-Leipnik:
+#     func: newton_leipnik_system
+#     params:
+#       a:
+#         type: uniform
+#         range: [0.3, 0.5]
+#       b:
+#         type: uniform
+#         range: [0.35, 0.45]
+#     sim_time: 100
+#     sim_steps: 10000
 
-  Qi-Chen:
-    func: qi_chen_system
-    params:
-      a:
-        type: uniform
-        range: [35, 40]
-      b:
-        type: uniform
-        range: [3, 3.5]
-      c:
-        type: uniform
-        range: [20, 28]
-    sim_time: 100
-    sim_steps: 10000
+#   Qi-Chen:
+#     func: qi_chen_system
+#     params:
+#       a:
+#         type: uniform
+#         range: [35, 40]
+#       b:
+#         type: uniform
+#         range: [3, 3.5]
+#       c:
+#         type: uniform
+#         range: [20, 28]
+#     sim_time: 100
+#     sim_steps: 10000
 
-  Rayleigh-Benard:
-    func: rayleigh_benard_system
-    params:
-      a:
-        type: uniform
-        range: [9, 10]
-      b:
-        type: uniform
-        range: [5, 6]
-      c:
-        type: uniform
-        range: [12, 13]
-    sim_time: 100
-    sim_steps: 10000
+#   Rayleigh-Benard:
+#     func: rayleigh_benard_system
+#     params:
+#       a:
+#         type: uniform
+#         range: [9, 10]
+#       b:
+#         type: uniform
+#         range: [5, 6]
+#       c:
+#         type: uniform
+#         range: [12, 13]
+#     sim_time: 100
+#     sim_steps: 10000
 
-  TSUCS1:
-    func: tsucs1_system
-    params:
-      a:
-        type: uniform
-        range: [40, 41]
-      b:
-        type: uniform
-        range: [0.7, 0.8]
-      c:
-        type: uniform
-        range: [0.6, 0.7]
-    sim_time: 100
-    sim_steps: 10000
+#   TSUCS1:
+#     func: tsucs1_system
+#     params:
+#       a:
+#         type: uniform
+#         range: [40, 41]
+#       b:
+#         type: uniform
+#         range: [0.7, 0.8]
+#       c:
+#         type: uniform
+#         range: [0.6, 0.7]
+#     sim_time: 100
+#     sim_steps: 10000
 
-  Liu-Chen:
-    func: liu_chen_system
-    params:
-      a:
-        type: uniform
-        range: [35, 36]
-      b:
-        type: uniform
-        range: [3, 3.5]
-      c:
-        type: uniform
-        range: [20, 28]
-      d:
-        type: uniform
-        range: [1, 2]
-    sim_time: 100
-    sim_steps: 10000
+#   Liu-Chen:
+#     func: liu_chen_system
+#     params:
+#       a:
+#         type: uniform
+#         range: [35, 36]
+#       b:
+#         type: uniform
+#         range: [3, 3.5]
+#       c:
+#         type: uniform
+#         range: [20, 28]
+#       d:
+#         type: uniform
+#         range: [1, 2]
+#     sim_time: 100
+#     sim_steps: 10000
 
-sim_params:
-  method: RK45
-  rtol: 1e-6
-  atol: 1e-9
+# sim_params:
+#   method: RK45
+#   rtol: 1e-6
+#   atol: 1e-9
 
-gan_params:
-  latent_dim: 100
-  batch_size: 64
-  num_epochs: 50
+# gan_params:
+#   latent_dim: 100
+#   batch_size: 64
+#   num_epochs: 50
